@@ -1,17 +1,19 @@
-import yaml
 import itertools
 import re
-from substrait.gen.proto.type_pb2 import Type
-from importlib.resources import files as importlib_files
 from collections import defaultdict
+from importlib.resources import files as importlib_files
 from pathlib import Path
 from typing import Optional, Union
-from .derivation_expression import evaluate, _evaluate, _parse
+
+import yaml
+
 from substrait.gen.antlr.SubstraitTypeParser import SubstraitTypeParser
 from substrait.gen.json import simple_extensions as se
+from substrait.gen.proto.type_pb2 import Type
 from substrait.simple_extension_utils import build_simple_extensions
-from .bimap import UriUrnBiDiMap
 
+from .bimap import UriUrnBiDiMap
+from .derivation_expression import _evaluate, _parse, evaluate
 
 DEFAULT_URN_PREFIX = "https://github.com/substrait-io/substrait/blob/main/extensions"
 
@@ -290,7 +292,7 @@ class FunctionEntry:
     def __repr__(self) -> str:
         return f"{self.name}:{'_'.join(self.normalized_inputs)}"
 
-    def satisfies_signature(self, signature: tuple) -> Optional[str]:
+    def satisfies_signature(self, signature: tuple | list) -> Optional[str]:
         if self.impl.variadic:
             min_args_allowed = self.impl.variadic.min or 0
             if len(signature) < min_args_allowed:
@@ -322,14 +324,12 @@ class FunctionEntry:
         output_type = evaluate(self.impl.return_, parameters)
 
         if self.nullability == se.NullabilityHandling.MIRROR:
-            sig_contains_nullable = any(
-                [
-                    p.__getattribute__(p.WhichOneof("kind")).nullability
-                    == Type.NULLABILITY_NULLABLE
-                    for p in signature
-                    if isinstance(p, Type)
-                ]
-            )
+            sig_contains_nullable = any([
+                p.__getattribute__(p.WhichOneof("kind")).nullability
+                == Type.NULLABILITY_NULLABLE
+                for p in signature
+                if isinstance(p, Type)
+            ])
             output_type.__getattribute__(output_type.WhichOneof("kind")).nullability = (
                 Type.NULLABILITY_NULLABLE
                 if sig_contains_nullable
@@ -417,7 +417,7 @@ class ExtensionRegistry:
 
     # TODO add an optional return type check
     def lookup_function(
-        self, urn: str, function_name: str, signature: tuple
+        self, urn: str, function_name: str, signature: tuple[Type] | list[Type]
     ) -> Optional[tuple[FunctionEntry, Type]]:
         if (
             urn not in self._function_mapping
