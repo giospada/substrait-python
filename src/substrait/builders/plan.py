@@ -5,9 +5,9 @@ All builders return UnboundPlan objects that can be materialized to a Plan using
 See `examples/builder_example.py` for usage.
 """
 
-from typing import Iterable, Optional, Union, Callable
 
-from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
+from typing import Callable, Iterable, Optional, TypedDict, Union
+
 import substrait.gen.proto.algebra_pb2 as stalg
 import substrait.gen.proto.extended_expression_pb2 as stee
 import substrait.gen.proto.plan_pb2 as stp
@@ -17,19 +17,27 @@ from substrait.builders.extended_expression import (
     resolve_expression,
 )
 from substrait.extension_registry import ExtensionRegistry
+from substrait.gen.proto.extensions.extensions_pb2 import AdvancedExtension
 from substrait.type_inference import infer_plan_schema
 from substrait.utils import (
     merge_extension_declarations,
-    merge_extension_urns,
     merge_extension_uris,
+    merge_extension_urns,
 )
 
 UnboundPlan = Callable[[ExtensionRegistry], stp.Plan]
 
 PlanOrUnbound = Union[stp.Plan, UnboundPlan]
 
+_ExtensionDict = TypedDict(
+    "_ExtensionDict",
+    {"extension_uris": list, "extension_urns": list, "extensions": list},
+)
 
-def _merge_extensions(*objs):
+
+def _merge_extensions(
+    *objs,
+) -> _ExtensionDict:
     """Merge extension URIs, URNs, and declarations from multiple plan/expression objects.
 
     During the URI -> URN migration period, we maintain both URI and URN references
